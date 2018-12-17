@@ -11,6 +11,6 @@ Project for our course in time series analysis.
 
 ### System Equation for the Kalman filter
 
-![System Equation]('https://github.com/smith-erik/TSA-Project/blob/master/SystemEq.jpg')
+![System Equation](images/SystemEq.jpg)
 
 
