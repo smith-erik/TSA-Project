@@ -5,43 +5,18 @@ close all;
 clc;
 
 load('../data/proj18.mat')
+load('../data/kalmanRain.mat')
+kalmanRain = kalmanRain';
+kalmanRain = kalmanRain(793:end);
 
 %% B - Modelling and validation
 close all
 ndvi = ElGeneina.nvdi;
 ndvi_t = ElGeneina.nvdi_t;
-rain = rainflat;
-%rain = rainlog;
-rain_t = rain_t_long;
-%rain = ElGeneina.rain;
-%rain_t = ElGeneina.rain_t;
+rain = kalmanRain;
+rain_t = ElGeneina.rain_t;
 lambda = bcNormPlot(ndvi);
-ndvi_inv_sqr = ndvi.^(-1/2);
-%% Without Inv Squared
-% Throw away data from 1960 to 1982: that's 22*12*3 = 792 points.
-rain = rain(793:end);
-
-ndvi_noscale = ndvi;
-rain_noscale = rain;
-
-% Rescale to [-1,1]
-k = 2/(max(ndvi)-min(ndvi));
-ndvi = ndvi*k + (1 - k*max(ndvi));
-% Split data into 70 % modelling, 30 % test.
-N = length(ndvi);
-test_size = 0.7;
-
-ndvi_test = ndvi(floor(N*test_size)+1 : end);
-rain_test = rain(floor(N*test_size)+1 : end);
-
-ndvi_t_test = ndvi_t(floor(N*test_size)+1 : end);
-rain_t_test = rain_t(floor(N*test_size)+1 : end);
-
-ndvi = ndvi(1 : floor(N*test_size));
-rain = rain(1 : floor(N*test_size));
-
-ndvi_t = ndvi_t(1 : floor(N*test_size));
-rain_t = rain_t(1 : floor(N*test_size));
+ndvi_inv_sqr = ndvi.^(lambda);
 %% WITH INV_square
 % Rescale to [-1,1]
 k = 2/(max(ndvi_inv_sqr)-min(ndvi_inv_sqr));
@@ -79,9 +54,6 @@ ndvi_s = filter(A36,1, ndvi);
 %%
 analyzets(ndvi_s,400)
 %%
-%figure(2)
-%plotNTdist(ndvi_s)
-
 data = iddata(ndvi_s);
 
 model_init = idpoly([1 0], [] , [1 zeros(1,36)] );
@@ -108,7 +80,7 @@ ehat.y(i_min) = [];
 %% Pre-whiten rain 
 A36 = [1 zeros(1,35) -1];
 rain_s = filter(A36, 1, rain);
-data = iddata(rain_s');
+data = iddata(rain_s);
 
 model_init = idpoly([1 0], [] , [1 zeros(1,36)] );
 model_init.Structure.c.Free = [1 1 zeros(1,34) 1];
@@ -124,12 +96,6 @@ ndvi_pw = filter(A, C, ndvi_s);
 
 %analyzets(rain_pw);
 %whitenessTest(rain_pw)
-%% 
-A36 = [1 zeros(1,35) -1];
-rain_s = filter(A36, 1, rain);
-data = iddata(rain_s');
-
-rain_log = real(log(rain_s));
 %% 
 % Data is now white, estimate impulse response weights
 % to find order of B and A2.
@@ -159,7 +125,7 @@ Mi = idpoly(1, B, [], [], A2);
 % Lock delay coefficients
 Mi.Structure.b.Free = [ zeros(1,d) 1 ones(1,s)];
 
-zpw = iddata(ndvi_pw, rain_pw');
+zpw = iddata(ndvi_pw, rain_pw);
 
 Mba2 = pem(zpw, Mi);
 present(Mba2)
@@ -167,17 +133,16 @@ present(Mba2)
 %vhat = resid(Mba2, zpw);
 %resid(zpw, Mba2)
 
-x = ndvi_s - filter(Mba2.B, Mba2.F, rain_s)';
+x = ndvi_s - filter(Mba2.B, Mba2.F, rain_s);
+analyzets(x) % A order 1, C order 0
 
-analyzets(x') % A order 1, C order 0
-
-%% 
+%% Final Whiteness Testing
 close all
 A1 = [1 0];
 C1 = 1;
 
 Mi = idpoly(1, B, C, A1, A2);
-z = iddata(ndvi_s, rain_s');
+z = iddata(ndvi_s, rain_s);
 MboxJ = pem(z,Mi);
 present(MboxJ)
 
@@ -191,10 +156,10 @@ plot(resid.y)
 close all;
 clc;
 
-z_test = iddata(ndvi_test, rain_test');
+z_test = iddata(ndvi_test, rain_test);
 y_test = predict(MboxJ, z_test,1);
 
-z = iddata(ndvi, rain');
+z = iddata(ndvi, rain);
 y = predict(MboxJ, z, 1);
 
 
@@ -202,32 +167,12 @@ subplot(211)
 plot(ndvi_t_test(1:end), z_test.y(1:end))
 hold on
 plot(ndvi_t_test, y_test.y)
+title('TEST SET')
+legend('Real','Estimate')
 
 subplot(212)
 plot(ndvi_t, z.y)
 hold on
 plot(ndvi_t, y.y)
-
-%% Prediction with season:ed test-data
-close all;
-clc;
-A36 = [1 zeros(1,35) -1];
-rain_test_s = filter(A36, 1, rain_test);
-ndvi_test_s = filter(A36, 1, ndvi_test);
-z_test = iddata(ndvi_test_s, rain_test_s');
-y_test = predict(MboxJ, z_test,1);
-
-z = iddata(ndvi_s, rain_s');
-y = predict(MboxJ, z, 1);
-
-subplot(211)
-plot(ndvi_t_test(1:end), z_test.y(1:end))
-hold on
-plot(ndvi_t_test, y_test.y)
-legend('Actual Value', 'Estimation')
-
-subplot(212)
-plot(ndvi_t, z.y)
-hold on
-plot(ndvi_t, y.y)
-legend('Actual Value', 'Estimation')
+title('TRAINING SET')
+legend('Real','Estimate')
