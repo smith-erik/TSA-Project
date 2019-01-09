@@ -84,14 +84,6 @@ set(gca,'Fontsize',13)
 analyzets(ehat.y)
 figure(2)
 whitenessTest(ehat.y)
-%%
-%[~,i_max] = max(ehat.y);
-[~,i_min] = min(ehat.y);
-%ehat.y(i_max) = [];
-ehat.y(i_min) = [];
-analyzets(ehat);
-whitenessTest(ehat.y)
-
 
 %% 2. More advanced Box-Jenkins model with rain as input.
 % Pre-whiten rain
@@ -177,9 +169,10 @@ plot(res.y)
 %% Prediction
 close all;
 clc;
+k = 4;
 
 z_test = iddata(ndvi_test, rain_test);
-y_test = predict(MboxJ, z_test,1);
+y_test = predict(MboxJ, z_test,k);
 
 z = iddata(ndvi, rain);
 y = predict(MboxJ, z, 1);
@@ -188,7 +181,7 @@ y = predict(MboxJ, z, 1);
 subplot(211)
 plot(ndvi_t_test, z_test.y)
 hold on
-plot(ndvi_t_test(1:end-1), y_test.y(2:end))
+plot(ndvi_t_test(1:end-k), y_test.y(k+1:end))
 title('Prediction')
 legend('Real','Estimate')
 subplot(212)
