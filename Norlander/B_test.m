@@ -13,7 +13,7 @@ rain_t = ElGeneina.rain_t;
 % Throw away data from 1960 to 1982: that's 22*12*3 = 792 points.
 rain = rain(793:end);
 
-clear Kassala ElGeneina;
+%clear Kassala ElGeneina;
 
 ndvi_noscale = ndvi;
 rain_noscale = rain;
@@ -21,6 +21,20 @@ rain_noscale = rain;
 % Rescale to [-1,1]
 k = 2/(max(ndvi)-min(ndvi));
 ndvi = ndvi*k + (1 - k*max(ndvi));
+
+figure(1); clf;
+
+subplot(211)
+plot(ndvi_t,ndvi)
+xlabel('Year')
+ylabel('NDVI')
+set(gca,'Fontsize',12)
+
+subplot(212)
+plot(rain_t,ElGeneina.rain)
+xlabel('Year')
+ylabel('Rain')
+set(gca,'Fontsize',12)
 
 %% Split data into 70 % modelling, 30 % test.
 N = length(ndvi);

@@ -1,5 +1,5 @@
-addpath('/Users/eriknorlander/Documents/MATLAB/FMSN45/downloadMaterialTSA/data')
-addpath('/Users/eriknorlander/Documents//MATLAB/FMSN45/downloadMaterialTSA/matlab')
+addpath('../data')
+addpath('../matlab')
 EG = struct2cell(ElGeneina);
 KA = struct2cell(Kassala);
 %%

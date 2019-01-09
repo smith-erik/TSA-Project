@@ -1,0 +1,132 @@
+
+
+
+
+\newpage
+
+\section*{A - Recursive reconstruction of rain data}
+
+As mentioned in the introduction, the NDVI was measured three times a month, while the total amount of precipitation was measured once a month. Thus, one needs to reconstruct the 10-day measurements in-between the monthly ones. There are several ways to approach this problem. As a simple solution, one could linearly interpolate between the monthly measurements. Resulting data from this rather ad hoc approach was provided in the project data.
+
+One should note that the monthly measurements is \textit{accumulated} rain for each month; the three reconstructed measurements for each month should sum to the provided monthly total precipitation. The problem with linearly interpolating is that it completely ignores this criterion. For almost all months, it will yield a monthly sum much larger than the true monthly precipitation. To take this rather important criterion into account, one can instead use a Kalman filter to reconstruct the 10-day precipitation measurements.
+
+Denoting the monthly measurements as $y_t$ and the 10-day measurements as $x_t$, one acquires the measurement equation
+\begin{equation}
+y_t = x_t + x_{t-1} + x_{t-2} + w_t \ \text{ for }\  t = 1, 4, 7, 10, ... \ .
+\label{eq:rain_measurement}
+\end{equation}
+%
+To create the desired Kalman filter, one needs to formulate system equations and matrices (see book eq. 8.40 \& 8.41). From equation \ref{eq:rain_measurement}, one can identify $\m C$ and our state vector $\m{z}_t$:
+\begin{align}
+    y_t &= x_t + x_{t-1} + x_{t-2} + w_t \\
+     &=
+    \underbrace{
+        \begin{bmatrix}
+        1 & 1 & 1 \\
+        \end{bmatrix}}_{\m C}
+    \underbrace{
+        \begin{bmatrix}
+        x_t \\
+        x_{t-1} \\
+        x_{t-2}
+        \end{bmatrix}}_{\m{z}_t}
+    +w_t
+\end{align}
+
+One may note that the mixed timescales complicates our system: $\m{z}_t$ is on the $\sim$10-day time scale, while $y_t$ is on a monthly time scale. To handle this, we predict three steps (i.e. one month) at once in our equation for $\m{z}_{t+1}$. Predictions are made with an AR(1) model: $y_t = -a_1 y_{t-1} + e_t$. This method yields the following equation for $\m{z}_{t+1}$:
+
+\begin{equation}
+    \underbrace{
+        \begin{bmatrix}
+        x_{t+3}\\
+        x_{t+2} \\
+        x_{t+1}
+        \end{bmatrix}}_{\m{z}_{t+1}}
+        =
+    \underbrace{
+        \begin{bmatrix}
+        (-a_1)^3 & 0 & 0 \\
+        (-a_1)^2 & 0 & 0 \\
+        -a_1 & 0 & 0
+        \end{bmatrix}}_{\m A}
+    \underbrace{
+        \begin{bmatrix}
+        x_t \\
+        x_{t-1} \\
+        x_{t-2}
+        \end{bmatrix}}_{\m{z}_{t}} + e_t
+\end{equation}
+
+We also need to choose $\m{R}_e$ and $\{R}_w$ (see book eq. 8.115 \& 8.116). 
+
+
+\begin{itemize}
+    \item Transformations?
+    \item Choice of $\m{R}_e$, $\m{R}_w$. Initial value and variance.
+    \item Results on their own.
+    \item Comparison with given linear interpolation.
+\end{itemize}
+
+\section*{Task B}
+After the initial scaling was done as described in the introduction, the data was split into training (70\%) and test (30\%) data sets. (Rimligt att analyzets på training?)
+
+In order to get an understanding of the data we're dealing with, the ACF and PACF was studied. As can be seen in the PACF of figure \ref{fig:ndvi_analyzets} it seems plausible to use an AR(1)-process for modelling the data. The ACF shows a periodicity of 36 which became even more apparent when plotted longer. The data doesn't look very Gaussian, so perhaps it follows another distribution. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{Bilder/ndvi_analyzets.png}
+    \caption{Caption}
+    \label{fig:ndvi_analyzets}
+\end{figure}
+After these attributes were identified, the seasonality of 36 was removed and an AR(1)-process was used to model the data. This obviously refers to a yearly cycle as the NDVI-measurements were taken 3 times each year and 3*12=36. Effectively making this an SAR(1) process (Seasonal Auto Regressive) described as equation \eqref{eq:SAR1}
+
+\begin{equation}
+    y_t + a_1 y_{t-1} = e_t + c_{36} e_{t-36}
+    \label{eq:SAR1}
+\end{equation}
+
+Where $A = [1, a_1]$ and $C = [1, 0 \dots 0]$ with a length of 36. 
+This was performed in MATLAB by using the System Identification Toolbox where one has the ability to lock some coefficients so the model doesn't start computing values for $c_2$ through $c_{25}$. After this the prediction error estimate was computed in order to update the parameters for the model we want to fit. These results are presented in figure \ref{fig:SAR1-model}. As can be seen there, both $a_1$ and $c_{36}$ are significant parameters as they are within the confidence interval.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{Bilder/present_sar.png}
+    \caption{Caption}
+    \label{fig:SAR1-model}
+\end{figure}
+After the model was created, an analysis of the residuals was done using \texttt{analyzets}. Here, the goal is to get residuals behaving as Gaussian white noise. When a whiteness test was done on this set only the McLeod-Li test was passed. In normality plot there 2 outliers were noted. To make it a little clearer one can use the histogram in figure \ref{fig:ehat_hist}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Bilder/ehat_hist.png}
+    \caption{Caption}
+    \label{fig:ehat_hist}
+\end{figure}
+These two outliers were removed...
+\subsection*{Box-Jenkins \& Pre-Whitening}
+In order to use the rain data as input the Box-Jenkins framework is going to be used as described in \eqref{eq:Box-Jenkins}.
+\begin{equation}
+    y_t = \frac{C_1(z)}{A_1(z)}e_t + \frac{B(z)z^{-d}}{A_2(z)}u_t
+    \label{eq:Box-Jenkins}
+\end{equation}
+Since the input signal, the rain, is not white a model for the input must be created such that it can be modeled as an ARMA-model and then inverse transformed so that white noise can be used as input. This is essential to the Box-Jenkins framework. From studying it's ACF and PACF and find an ARMA(1,2) process with a season at 36 period once more, so $A_3$ and $C_3$ are defined as below
+\begin{align*}
+    A_3(z) &= 1 + a_1z^{-1} \\
+    C_3(z) &= 1 + c_1z^{-1} + c_2z^{-2} + c_{36}z^{-36}
+\end{align*}
+The model was implemented and significant coefficients were found (describe what they were!). 
+
+
+% New part:
+By denoting d,s and r as these estimated parameters,
+A2 is estimated to: B is estimated to: ...
+these transfer functions were put into the idpoly-
+function and estimated with pem (significant coeff)
+then the process without input was modelled as described..
+As is clear from this part it's an AR(1)-process
+Modelling this yields very nice results as the 
+residuals pass the sign-test, while not being completly 
+white ( actually more of a T-distribution)
+
+This tields a very good prediction as can be seen 
+in the following plots!
+\section*{Task C}
+
+\section*{Task D}
