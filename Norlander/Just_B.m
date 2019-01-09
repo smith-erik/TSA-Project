@@ -9,20 +9,28 @@ load('../data/kalmanRain.mat')
 kalmanRain = kalmanRain';
 kalmanRain = kalmanRain(793:end);
 
+
 %% B - Modelling and validation
 close all
 ndvi = ElGeneina.nvdi;
 ndvi_t = ElGeneina.nvdi_t;
 rain = kalmanRain;
 rain_t = ElGeneina.rain_t;
-lambda = bcNormPlot(ndvi);
-ndvi_inv_sqr = ndvi.^(lambda);
+%lambda = bcNormPlot(ndvi);
+%ndvi_inv_sqr = ndvi.^(lambda);
 %% WITH INV_square
 % Rescale to [-1,1]
-k = 2/(max(ndvi_inv_sqr)-min(ndvi_inv_sqr));
-ndvi_transformed = ndvi_inv_sqr*k + (1 - k*max(ndvi_inv_sqr));
+lambda = bcNormPlot(ndvi);
+lambda2 = bcNormPlot(rain);
+ndvi = (ndvi).^(lambda);
+rain = (rain+2).^(lambda2);
+%%
+k = 2/(max(ndvi)-min(ndvi));
+ndvi_transformed = ndvi*k + (1 - k*max(ndvi));
+
 
 % Split data into 70 % modelling, 30 % test.
+
 N = length(ndvi_transformed);
 test_size = 0.7;
 
@@ -38,7 +46,6 @@ rain = rain(1 : floor(N*test_size));
 ndvi_t = ndvi_t(1 : floor(N*test_size));
 rain_t = rain_t(1 : floor(N*test_size));
 
-
 %% See PACF
 analyzets(ndvi)
 % -> AR(1)
@@ -49,20 +56,22 @@ analyzets(ndvi, 400)
 
 
 %% Remove season
-A36 = [1 zeros(1,35) -1];
-ndvi_s = filter(A36,1, ndvi);
+%A36 = [1 zeros(1,35) -1];
+%ndvi_s = filter(A36,1, ndvi);
+ndvi_s = ndvi; % Don't do separate, add a36 in A instead.
 %%
-analyzets(ndvi_s,400)
+analyzets(ndvi_s, 50)
 %%
 data = iddata(ndvi_s);
 
-model_init = idpoly([1 0], [] , [1 zeros(1,36)] );
+model_init = idpoly([1 zeros(1,36)], [] , [1 zeros(1,36)] );
 
 model_init.Structure.c.Free = [1 zeros(1,35) 1];
+model_init.Structure.a.Free = [1 zeros(1,35) 1];
 
 model_ar = pem(data, model_init);
 present(model_ar)
-
+%%
 ehat = resid(ndvi_s, model_ar);
 histogram(ehat.y)
 title('Histogram over the errors')
@@ -70,13 +79,12 @@ xlabel('Deviation')
 ylabel('Number of samples')
 set(gca,'Fontsize',13)
 %%
-% If not removing outliers, doesn't pass Ljung Box Pierce!
-[~,i_max] = max(ehat.y);
+%[~,i_max] = max(ehat.y);
 [~,i_min] = min(ehat.y);
-ehat.y(i_max) = [];
+%ehat.y(i_max) = [];
 ehat.y(i_min) = [];
-%analyzets(ehat);
-%whitenessTest(ehat.y)
+analyzets(ehat);
+whitenessTest(ehat.y)
 %% Pre-whiten rain 
 A36 = [1 zeros(1,35) -1];
 rain_s = filter(A36, 1, rain);
@@ -110,9 +118,9 @@ plot(-M:M, -2/sqrt(length(rain_pw))*ones(1,2*M+1), '--')
 hold off
 %%
 % Yields
-d = 1; % 10 day delay after rain
-s = 0;
-r = 0;
+d = 2; % 10 day delay after rain
+s = 2;
+r = 1;
 
 % idpoly(A,B,C,D,F,NoiseVariance,Ts)
 % A(q) y(t) = [B(q)/F(q)] u(t) + [C(q)/D(q)] e(t)
@@ -161,15 +169,14 @@ y_test = predict(MboxJ, z_test,1);
 
 z = iddata(ndvi, rain);
 y = predict(MboxJ, z, 1);
-
+%%
 
 subplot(211)
-plot(ndvi_t_test(1:end), z_test.y(1:end))
+plot(ndvi_t_test(1:end-1), z_test.y(1:end-1))
 hold on
 plot(ndvi_t_test, y_test.y)
-title('TEST SET')
+title('Prediction')
 legend('Real','Estimate')
-
 subplot(212)
 plot(ndvi_t, z.y)
 hold on
