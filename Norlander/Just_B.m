@@ -24,7 +24,8 @@ lambda = bcNormPlot(ndvi);
 lambda2 = bcNormPlot(rain);
 ndvi = (ndvi).^(lambda);
 rain = (rain+2).^(lambda2);
-%%
+
+%% Split into model set and test set
 k = 2/(max(ndvi)-min(ndvi));
 ndvi_transformed = ndvi*k + (1 - k*max(ndvi));
 
@@ -56,18 +57,19 @@ analyzets(ndvi, 400)
 
 
 %% Remove season
-%A36 = [1 zeros(1,35) -1];
-%ndvi_s = filter(A36,1, ndvi);
-ndvi_s = ndvi; % Don't do separate, add a36 in A instead.
+A36 = [1 zeros(1,35) -1];
+ndvi_s = filter(A36,1, ndvi);
+%ndvi_s = ndvi; % Don't do separate, add a36 in A instead.
 %%
 analyzets(ndvi_s, 50)
-%%
+
+%% 1. Simple AR model, no rain as input.
 data = iddata(ndvi_s);
 
-model_init = idpoly([1 zeros(1,36)], [] , [1 zeros(1,36)] );
+model_init = idpoly([1 0], [] , [1 zeros(1,36)] );
 
 model_init.Structure.c.Free = [1 zeros(1,35) 1];
-model_init.Structure.a.Free = [1 zeros(1,35) 1];
+%model_init.Structure.a.Free = [1 zeros(1,35) 1];
 
 model_ar = pem(data, model_init);
 present(model_ar)
@@ -79,13 +81,21 @@ xlabel('Deviation')
 ylabel('Number of samples')
 set(gca,'Fontsize',13)
 %%
+analyzets(ehat.y)
+figure(2)
+whitenessTest(ehat.y)
+%%
 %[~,i_max] = max(ehat.y);
 [~,i_min] = min(ehat.y);
 %ehat.y(i_max) = [];
 ehat.y(i_min) = [];
 analyzets(ehat);
 whitenessTest(ehat.y)
-%% Pre-whiten rain 
+
+
+%% 2. More advanced Box-Jenkins model with rain as input.
+% Pre-whiten rain
+
 A36 = [1 zeros(1,35) -1];
 rain_s = filter(A36, 1, rain);
 data = iddata(rain_s);
@@ -119,8 +129,8 @@ hold off
 %%
 % Yields
 d = 2; % 10 day delay after rain
-s = 2;
-r = 1;
+s = 0;
+r = 0;
 
 % idpoly(A,B,C,D,F,NoiseVariance,Ts)
 % A(q) y(t) = [B(q)/F(q)] u(t) + [C(q)/D(q)] e(t)
@@ -146,20 +156,24 @@ analyzets(x) % A order 1, C order 0
 
 %% Final Whiteness Testing
 close all
+%A1 = [1 zeros(1,36)];
 A1 = [1 0];
 C1 = 1;
 
-Mi = idpoly(1, B, C, A1, A2);
+Mi = idpoly(1, B, C1, A1, A2);
+
+%Mi.Structure.c.Free = [1 zeros(1,35) 1];
+
 z = iddata(ndvi_s, rain_s);
 MboxJ = pem(z,Mi);
 present(MboxJ)
 
-resid = resid(z, MboxJ); % Nice!
-whitenessTest(resid.y)
+res = resid(z, MboxJ); % Nice!
+whitenessTest(res.y)
 %%
-plotNTdist(resid.y)
+plotNTdist(res.y)
 %%
-plot(resid.y)
+plot(res.y)
 %% Prediction
 close all;
 clc;
@@ -172,9 +186,9 @@ y = predict(MboxJ, z, 1);
 %%
 
 subplot(211)
-plot(ndvi_t_test(1:end-1), z_test.y(1:end-1))
+plot(ndvi_t_test, z_test.y)
 hold on
-plot(ndvi_t_test, y_test.y)
+plot(ndvi_t_test(1:end-1), y_test.y(2:end))
 title('Prediction')
 legend('Real','Estimate')
 subplot(212)
