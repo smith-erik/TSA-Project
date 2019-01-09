@@ -64,6 +64,11 @@ Re = [sig_e_2 0 0;
       0 sig_e_2 0;
       0 0 sig_e_2];
 
+%Re = [sig_e_2 50 20;
+%      50 sig_e_2 30;
+%      20 30 sig_e_2];
+
+
 % Observation noise variance
 Rw = 1;
 
@@ -89,7 +94,7 @@ for k = 1:N
     Rxx = (eye(3) - Kt * C) * Rxx_1;
     
     % Save
-    xsave(:,k) = xtt;
+    xsave(:,k) = xtt;q
     
     % Predict
     Rxx_1 = A * Rxx * A' + Re;
@@ -97,74 +102,49 @@ for k = 1:N
     
 end
 
+xsave_flat = reshape(xsave, 1, length(xsave)*length(xsave(:,1)) );
 
 
-kalmanRain = reshape(xsave, 1, length(xsave)*length(xsave(:,1)) );
-kalmanRain(kalmanRain < 0) = 0;
-
-% Some values are < 0, not possible.
-% Difference in final result is negligeable.
-xsave(xsave < 0) = 0; 
+figure(2)
+plot(rain_t, rain, 'k.-') % What do we do about negative?
+hold on
+plot(intRain_t, xsave_flat, 'b.-')
 
 % Plot
 % 1. 30-day sum of Kalman data
 % 2. Interpolated 10-day rain data and Kalman 10-day estimate
 
-figure(2)
-plot(xsave(1,:))
 
 rainsum = sum(xsave, 1);
 figure(3)
-plot(rain, 'b-')
+plot(rain_t, rain, 'ko')
 hold on
-plot(rainsum, 'r-.')
+plot(rain_t, rainsum, 'b-x')
+title('Monthly Sum of Estimations vs True Monthly Precipitation')
+set(gca, 'fontsize', 14)
 legend('True', 'Estimated', 'Location', 'northeast')
 
 
-%% Kalman reconstruction vs interpolation
-close all;
-clc;
 
-xsave_flat = reshape(xsave, 1, length(xsave)*length(xsave(:,1)) );
-kalmanMonthSum = sum(xsave, 1)';
+k = 2;
+rainPred = zeros(N,1);
 
-intMonthSum = zeros(length(rain), 1);
-k = 1;
-for i = 3:3:length(intRain)
-    intMonthSum(k) = intRain(i) + intRain(i-1) + intRain(i-2);
-    k = k + 1;
+% From 1+k since we skip the first k due to prediction
+for i = 1+k:N
+    rainPred(i) = C * A^k * xsave(:,i-k);
 end
 
-% Sum the squared difference between true monthly and estimated monthly
-SSR_Kalman = sum( (rain - kalmanMonthSum).^2 );
-SSR_Interpolated = sum( (rain - intMonthSum).^2 );
-
-fprintf('Squared sum of resuduals for the monthly sum from ...\n')
-fprintf('Kalman: %f.\nInterpolated: %f.\n', SSR_Kalman, SSR_Interpolated)
-
-fprintf('\nTotal rain ...\n')
-fprintf('True: %f.\n', sum(rain))
-fprintf('Kalman: %f.\nInterpolated: %f.\n', sum(xsave_flat), sum(intRain))
+rainPred = rainPred(1+k:end);
+rain_cut_k = rain(1+k:end);
 
 
-
-figure(4)
-plot(rain_t, rain, 'ko')
+figure(5)
+plot(rain_cut_k, 'k-')
 hold on
-plot(intRain_t, xsave_flat, 'b:')
-plot(intRain_t, intRain, 'r:')
-plot(rain_t, kalmanMonthSum, 'bx')
-plot(rain_t, intMonthSum, 'rx')
+plot(rainPred, 'b-')
+legend('True', 'Estimated', 'Location', 'northeast')
 
-legend('True monthly total', 'Kalman Estimated', 'Interpolated', 'Monthly sum from Kalman', ...
-       'Monthly sum from interpolated', 'Location', 'northeast')
-set(gca, 'fontsize', 12)
-set(gcf, 'position', [100  200 1200 600])
-
-
-%% Save interpolation in data folder
-
-save('../data/kalmanRain.mat', 'kalmanRain')
+% save('KalmanRain', xsave_flat)
 
 
 
