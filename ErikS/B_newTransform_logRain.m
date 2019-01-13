@@ -62,7 +62,7 @@ analyzets(ndvi, 80)
 %% Remove the season
 
 A36 = [1 zeros(1,35) -1];
-ndvi_s = filter(A36,1, ndvi);
+ndvi_s = filter(A36, 1, ndvi);
 
 figure(2)
 plotNTdist(ndvi_s)
@@ -108,7 +108,7 @@ analyzets(rain_s)
 
 data = iddata(rain_s);
 model_init = idpoly([1 0], [] , [1 zeros(1,36)] );
-model_init.Structure.c.Free = [1 1 zeros(1,34) 1];
+model_init.Structure.c.Free = [1 0 0 0 1 zeros(1,31) 1];
 model_arma = pem(data,model_init);
 present(model_arma)
 
