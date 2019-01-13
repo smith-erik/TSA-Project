@@ -140,7 +140,6 @@ hold off
 d = 2;
 s = 4;
 r = 1;
-
 % idpoly(A,B,C,D,F,NoiseVariance,Ts)
 % A(q) y(t) = [B(q)/F(q)] u(t) + [C(q)/D(q)] e(t)
 A2 = [1 zeros(1,r)];
@@ -184,7 +183,7 @@ C1 = [1 zeros(1,36)];
 
 data = iddata(ndvi_s, rain_s);
 model_init = idpoly(1, B, C1, A1, A2);
-model_init.Structure.c.Free = [1 zeros(1,35) 1];
+model_init.Structure.c.Free = [1 1 1 zeros(1,33) 1];
 
 MboxJ = pem(data, model_init);
 present(MboxJ)
@@ -200,7 +199,6 @@ analyzets(finalRes.y)
 
 figure(3)
 plotNTdist(finalRes.y)
-
 
 
 
@@ -224,59 +222,70 @@ pred_train = predict(MboxJ, data, k);
 pred_test.y = filter(1, A36, pred_test.y);
 data_test.y = filter(1, A36, data_test.y);
 
-%pred_train.y = filter(1, A36, pred_train.y);
-%data_train.y = filter(1, A36, data_train.y);
+pred_train.y = filter(1, A36, pred_train.y);
+data_train.y = filter(1, A36, data_train.y);
 
 
 subplot(2,1,1)
-plot(ndvi_t_test, data_test.y)
+plot(ndvi_t_test(k+1:end), data_test.y(1:end-k))
 hold on
-plot(ndvi_t_test, pred_test.y)
+plot(ndvi_t_test(k+1:end), pred_test.y(1:end-k))
 title('Test Set')
-legend('Real','Estimate', 'location', 'northwest')
+legend('Real','Estimate', 'location', 'southwest')
 
 subplot(2,1,2)
-plot(ndvi_t, data_train.y)
+plot(ndvi_t(k+1:end), data_train.y(1:end-k))
 hold on
-plot(ndvi_t, pred_train.y)
+plot(ndvi_t(k+1:end), pred_train.y(1:end-k))
 title('Training Set')
-legend('Real','Estimate')
+legend('Real','Estimate', 'location', 'southwest')
+
+
+
 
 
 
 
 %% Predict and save plots for k as 1 through 10
 
-data_test = iddata(ndvi_test, rain_test);
-data_train = iddata(ndvi_s, rain);
-
 for k = 1:10
-    
     close all;
     clc;
 
+    ndvi_test_s = filter(A36, 1, ndvi_test);
+    rain_test_s = filter(A36, 1, rain_test);
+
+    data_test = iddata(ndvi_test_s, rain_test_s);
     pred_test = predict(MboxJ, data_test, k);
 
+    data_train = iddata(ndvi_s, rain_s);
     pred_train = predict(MboxJ, data, k);
 
+    % Add back season when plotting.
+    pred_test.y = filter(1, A36, pred_test.y);
+    data_test.y = filter(1, A36, data_test.y);
+
+    pred_train.y = filter(1, A36, pred_train.y);
+    data_train.y = filter(1, A36, data_train.y);
+
+    % Plot
     subplot(2,1,1)
-    plot(ndvi_t_test, data_test.y)
+    plot(ndvi_t_test(k+1:end), data_test.y(1:end-k))
     hold on
-    plot(ndvi_t_test, pred_test.y)
+    plot(ndvi_t_test(k+1:end), pred_test.y(1:end-k))
     title(sprintf('Test Set with k = %d', k))
-    legend('Real','Estimate', 'location', 'northwest')
+    legend('Real','Estimate', 'location', 'southwest')
 
     subplot(2,1,2)
-    plot(ndvi_t, data_train.y)
+    plot(ndvi_t(k+1:end), data_train.y(1:end-k))
     hold on
-    plot(ndvi_t, pred_train.y)
+    plot(ndvi_t(k+1:end), pred_train.y(1:end-k))
     title(sprintf('Training Set with k = %d', k))
-    legend('Real','Estimate')
+    legend('Real','Estimate', 'location', 'southwest')
     
     saveas(gcf,sprintf('Plots/PredPlots/k%d_log.png', k))
 
 end
-
 
 
 
