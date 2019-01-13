@@ -44,80 +44,84 @@ clearvars -except rain rain_t intRain intRain_t
 close all;
 clc;
 
-% Simulate/set process
 y = rain;
 N = length(y);
-
-% Define the state space equations
 a1 = -0.7;
 
-A = [-(a1.^3) 0 0;
-       a1.^2  0 0;
-      -a1     0 0];
+RwCoeffs = linspace(-5, 5, 10000);
+SSRs = zeros(length(RwCoeffs),1) - 1;
+idx = 1;
 
-C = [1 1 1];
-
-% Hidden state noise covariance matrix
-sig_e_2 = 119;
-Re = [sig_e_2 0 0;
-      0 sig_e_2 0;
-      0 0 sig_e_2];
-
-% Observation noise variance
-Rw = 1;
-
-% Set some initial values
-Rxx_1 = 10 * eye(3);
-xtt_1 = [0 0 0]';
-
-% Store values here
-xsave = zeros(3,N);
-
-
-% Kalman filter
-
-for k = 1:N
+for Rw = RwCoeffs
     
-    % Update
-    Ryy = C * Rxx_1 * C' + Rw; % Not t+1|t ?
+
+    % Define the state space equations
+    A = [-(a1.^3) 0 0;
+           a1.^2  0 0;
+          -a1     0 0];
+
+    C = [1 1 1];
+
+    % Hidden state noise covariance matrix
+    sig_e_2 = 100;
+    Re = [sig_e_2 0 0;
+          0 sig_e_2 0;
+          0 0 sig_e_2];
+
+    % Observation noise variance
+    % Rw = 1;
+
+    % Set some initial values
+    Rxx_1 = 10 * eye(3);
+    xtt_1 = [0 0 0]';
+
+    % Store values here
+    xsave = zeros(3,N);
+
+
+    % Kalman filter
+
+    for k = 1:N
+
+        % Update
+        Ryy = C * Rxx_1 * C' + Rw; % Not t+1|t ?
+
+        Kt = (Rxx_1 * C') / Ryy; % Same as above but t|t-1 ?
+
+        xtt = xtt_1 + Kt*(y(k) - C * xtt_1);
+
+        Rxx = (eye(3) - Kt * C) * Rxx_1;
+
+        % Save
+        xsave(:,k) = xtt;
+
+        % Predict
+        Rxx_1 = A * Rxx * A' + Re;
+        xtt_1 = A * xtt;
+
+    end
     
-    Kt = (Rxx_1 * C') / Ryy; % Same as above but t|t-1 ?
+    % Some values are < 0, not possible.
+    % Difference in final result is negligeable.
+    xsave(xsave < 0) = 0;
     
-    xtt = xtt_1 + Kt*(y(k) - C * xtt_1);
-    
-    Rxx = (eye(3) - Kt * C) * Rxx_1;
-    
-    % Save
-    xsave(:,k) = xtt;
-    
-    % Predict
-    Rxx_1 = A * Rxx * A' + Re;
-    xtt_1 = A * xtt;
-    
+    % Calculate and save squared sum of residuals
+    kalmanMonthSum = sum(xsave, 1)';
+    SSRs(idx) = sum( (rain - kalmanMonthSum).^2 );
+    idx = idx + 1;
+
 end
 
-
-xflat = reshape(xsave, 1, length(xsave)*length(xsave(:,1)) );
-kalmanRain = reshape(xsave, 1, length(xsave)*length(xsave(:,1)) );
-kalmanRain(kalmanRain < 0) = 0;
-
-% Some values are < 0, not possible.
-% Difference in final result is negligeable.
-xsave(xsave < 0) = 0; 
-
-% Plot
-% 1. 30-day sum of Kalman data
-% 2. Interpolated 10-day rain data and Kalman 10-day estimate
-
 figure(2)
-plot(kalmanRain)
+plot(RwCoeffs, SSRs);
+title('Squared sum of residuals between true monthly and monthly sum of 10-day estimates')
+xlabel('R_w value')
+%ylabel('Accumulated rain  [mm]')
 
-rainsum = sum(xsave, 1);
-figure(3)
-plot(rain, 'b-')
-hold on
-plot(rainsum, 'r-.')
-legend('True', 'Estimated', 'Location', 'northeast')
+[RwMin, RwMinIdx] = min(SSRs);
+
+fprintf('Min: %f.\nFor R_w = %f.\n', RwMin, RwCoeffs(RwMinIdx))
+
 
 
 %% Kalman reconstruction vs interpolation
@@ -159,11 +163,6 @@ legend('True monthly total', 'Kalman Estimated', 'Interpolated', 'Monthly sum fr
        'Monthly sum from interpolated', 'Location', 'northeast')
 set(gca, 'fontsize', 12)
 set(gcf, 'position', [100  200 1200 600])
-
-
-%% Save interpolation in data folder
-
-save('../data/kalmanRain.mat', 'kalmanRain')
 
 
 
