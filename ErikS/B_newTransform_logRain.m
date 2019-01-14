@@ -206,7 +206,7 @@ plotNTdist(finalRes.y)
 close all;
 clc;
 
-k = 8;
+k = 1;
 
 % Predict on data with season removed.
 ndvi_test_s = filter(A36, 1, ndvi_test);
@@ -245,7 +245,7 @@ legend('Real','Estimate', 'location', 'southwest')
 figure(2)
 plot(ndvi_t_test, data_test.y, 'b.-')
 hold on
-plot(ndvi_t_test, pred_test.y)
+plot(ndvi_t_test, pred_test.y, 'r-')
 title('Test Set')
 legend('Real','k=1', 'location', 'northwest', 'orientation', 'horizontal')
 set(gca,'fontsize',16)
@@ -254,9 +254,8 @@ ylim([0 0.5])
 
 
 
-%% Plot 
+%% Plot predictions for k as 4 through 10
 close all;
-
 
 ndvi_test_s = filter(A36, 1, ndvi_test);
 rain_test_s = filter(A36, 1, rain_test);
@@ -264,7 +263,7 @@ rain_test_s = filter(A36, 1, rain_test);
 data_test = iddata(ndvi_test_s, rain_test_s);
 data_test.y = filter(1, A36, data_test.y);
 
-stepFig = figure(1)
+figure(1)
 plot(ndvi_t_test, data_test.y, 'b.-')
 
 
@@ -288,8 +287,42 @@ end
 legend('Real', 'k=4', 'k=5', 'k=6', 'k=7', 'k=8', 'k=9', 'k=10','location', ...
        'northwest','orientation', 'horizontal')
 set(gca,'fontsize',16)
-set(stepFig, 'position', [100 100 1200 500]);
+set(gcf, 'position', [100 100 1200 500]);
 ylim([0 0.5])
+
+
+
+
+%% Calculate SSR and variance of prediction errors for k = 1 through 10 for both models
+close all;
+clc;
+
+ndvi_test_s = filter(A36, 1, ndvi_test);
+rain_test_s = filter(A36, 1, rain_test);
+
+data_test = iddata(ndvi_test_s, rain_test_s);
+
+SSRs = zeros(10,2);
+errorVars = zeros(10,2);
+
+ehat_bj = zeros(length(data_test.y) , 10);
+ehat_ar = zeros(length(data_test.y) , 10);
+
+for i = 1:10
+
+
+    pred_test = predict(model_ar, data_test, i);
+    
+    ehat_ar(:,i) = data_test.y - pred_test.y;
+   
+    pred_test = predict(MboxJ, data_test, i);
+    
+    ehat_bj(:,i) = data_test.y - pred_test.y;
+
+end
+
+SSE = [sum(ehat_ar.^2); sum(ehat_bj.^2)];
+variance = [var(ehat_ar); var(ehat_bj)];
 
 
 
