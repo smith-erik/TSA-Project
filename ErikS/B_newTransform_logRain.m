@@ -157,7 +157,7 @@ present(Model_B_A2)
 %resid(Model_B_A2, data)
 
 % Analyze x to select orders for A1 and C1.
-% A1 order 1, C1 order 0 seems reasonable.
+% A1 order 1, C1 order 2 with added 36 seems reasonable.
 x = ndvi - filter(Model_B_A2.B, Model_B_A2.F, rain);
 analyzets(x)
 
@@ -206,7 +206,7 @@ plotNTdist(finalRes.y)
 close all;
 clc;
 
-k = 1;
+k = 8;
 
 % Predict on data with season removed.
 ndvi_test_s = filter(A36, 1, ndvi_test);
@@ -226,19 +226,74 @@ pred_train.y = filter(1, A36, pred_train.y);
 data_train.y = filter(1, A36, data_train.y);
 
 
+figure(1)
 subplot(2,1,1)
-plot(ndvi_t_test(k+1:end), data_test.y(1:end-k))
+plot(ndvi_t_test, data_test.y)
 hold on
-plot(ndvi_t_test(k+1:end), pred_test.y(1:end-k))
+plot(ndvi_t_test, pred_test.y)
 title('Test Set')
 legend('Real','Estimate', 'location', 'southwest')
 
 subplot(2,1,2)
-plot(ndvi_t(k+1:end), data_train.y(1:end-k))
+plot(ndvi_t, data_train.y)
 hold on
-plot(ndvi_t(k+1:end), pred_train.y(1:end-k))
+plot(ndvi_t, pred_train.y)
 title('Training Set')
 legend('Real','Estimate', 'location', 'southwest')
+
+
+figure(2)
+plot(ndvi_t_test, data_test.y, 'b.-')
+hold on
+plot(ndvi_t_test, pred_test.y)
+title('Test Set')
+legend('Real','k=1', 'location', 'northwest', 'orientation', 'horizontal')
+set(gca,'fontsize',16)
+set(gcf, 'position', [100 100 1200 500]);
+ylim([0 0.5])
+
+
+
+%% Plot 
+close all;
+
+
+ndvi_test_s = filter(A36, 1, ndvi_test);
+rain_test_s = filter(A36, 1, rain_test);
+
+data_test = iddata(ndvi_test_s, rain_test_s);
+data_test.y = filter(1, A36, data_test.y);
+
+stepFig = figure(1)
+plot(ndvi_t_test, data_test.y, 'b.-')
+
+
+hold on
+
+for k = 4:10
+
+    data_test = iddata(ndvi_test_s, rain_test_s);
+    pred_test = predict(MboxJ, data_test, k);
+
+    pred_test.y = filter(1, A36, pred_test.y);
+    data_test.y = filter(1, A36, data_test.y);
+
+    % Plot
+    plot(ndvi_t_test, pred_test.y)
+    title('k-step prediction with our Box-Jenkins model')
+    %legend('Real','Estimate', 'location', 'northwest')
+
+end
+
+legend('Real', 'k=4', 'k=5', 'k=6', 'k=7', 'k=8', 'k=9', 'k=10','location', ...
+       'northwest','orientation', 'horizontal')
+set(gca,'fontsize',16)
+set(stepFig, 'position', [100 100 1200 500]);
+ylim([0 0.5])
+
+
+
+
 
 
 
@@ -270,19 +325,19 @@ for k = 1:10
 
     % Plot
     subplot(2,1,1)
-    plot(ndvi_t_test(k+1:end), data_test.y(1:end-k))
+    plot(ndvi_t_test, data_test.y)
     hold on
-    plot(ndvi_t_test(k+1:end), pred_test.y(1:end-k))
-    title(sprintf('Test Set with k = %d', k))
+    plot(ndvi_t_test, pred_test.y)
+    title('Test Set')
     legend('Real','Estimate', 'location', 'southwest')
 
     subplot(2,1,2)
-    plot(ndvi_t(k+1:end), data_train.y(1:end-k))
+    plot(ndvi_t, data_train.y)
     hold on
-    plot(ndvi_t(k+1:end), pred_train.y(1:end-k))
-    title(sprintf('Training Set with k = %d', k))
+    plot(ndvi_t, pred_train.y)
+    title('Training Set')
     legend('Real','Estimate', 'location', 'southwest')
-    
+
     saveas(gcf,sprintf('Plots/PredPlots/k%d_log.png', k))
 
 end
